@@ -1,3 +1,4 @@
+#!/usr/bin/env python 
 import os
 import subprocess
 from abc import abstractmethod
@@ -90,7 +91,10 @@ class Temperature(Metric):
         if os.name == 'nt':
             return 0.0
         temperatures = psutil.sensors_temperatures()
-        return 0.0  # TODO
+        try:
+            return temperatures['coretemp'][0].current
+        except (KeyError, IndexError):
+            return 0.0
 
 
 class FanSpeed(Metric):
@@ -98,8 +102,10 @@ class FanSpeed(Metric):
         if os.name == 'nt':
             return 0.0
         fan_speeds = psutil.sensors_fans()
-        fan = list(fan_speeds.values())[0]
-        return 0.0  # TODO
+        try:
+            return list(fan_speeds.values())[0]
+        except (KeyError, IndexError):
+            return 0.0
 
 
 def write_output_to_file(command: str, path: Path):
@@ -130,7 +136,7 @@ def top(base_dir: Path, dt: datetime.datetime):
 
 headers = ["Timestamp", "CPU", "Memory", "Swap Memory", "Disk Read Time", "Disk Write Time", "Disk Usage", "Boot Time"]
 if os.name == "posix":
-    headers += ["Temperature", "Fan Speed"]
+    headers += ["Temperature"]
 
 
 def run(output_dir: Path):
@@ -152,7 +158,7 @@ def run(output_dir: Path):
     one_time_metrics = [m() for m in [DiskUsage, BootTime]]
     logger.info("Gathering one-time metrics %s", one_time_metrics)
     if os.name == "posix":
-        one_time_metrics += [Temperature, FanSpeed]
+        one_time_metrics += [Temperature()]
     for m in one_time_metrics:
         results.append(m.get_value())
     stats_file = output_dir / "stats.csv"
